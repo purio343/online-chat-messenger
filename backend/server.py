@@ -33,7 +33,7 @@ def main():
             clients[address] = {
                 "user_name": username,
                 "message": message,
-                # datetime.datetime.now() は、
+                # datetime.datetime.now() は、現在日時を取得する。
                 "last_seen": datetime.datetime.now(),
                 "failed_count": 0
             }
