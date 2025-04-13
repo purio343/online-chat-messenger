@@ -43,7 +43,8 @@ def main():
             # 全クライアントに送信。
             for client in list(clients.keys()):
                 try:
-                    sock.sendto(data, client)
+                    if client != address:
+                        sock.sendto(data, client)
                 except Exception as e:
                     print(f'Error sending to {client}: {e}')
                     clients[client]["failed_count"] += 1
