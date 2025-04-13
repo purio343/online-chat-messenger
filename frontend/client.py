@@ -41,7 +41,8 @@ def listen(sock, rate, name):
                 print(f'{now} {disp_name}: {message}')
                 sys.stdout.write('Type in your message: ')
                 sys.stdout.flush()
-                
+        except KeyboardInterrupt:
+            print("\nClosing socket")
         except Exception as e:
             print(f'Error receiving data: {e}')
 

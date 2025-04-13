@@ -3,15 +3,16 @@ import datetime
 import time
 import threading
 
+server_address = '0.0.0.0'
+port = 9001
+rate = 4096
+max_fails = 3
+clients = {}
+timeout = 60
+lock = threading.Lock()
+
 def main():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    server_address = '0.0.0.0'
-    port = 9001
-    rate = 4096
-    max_fails = 3
-    clients = {}
-    timeout = 60
-
     threading.Thread(target=cleanup_clients, args=(clients, timeout), daemon=True).start()
     sock.bind((server_address, port))
     # クライアントの情報を連想配列で保持。
@@ -30,13 +31,14 @@ def main():
             message = data[username_length + 1:].decode('utf-8')
 
             # クライアント情報を更新、または追加。
-            clients[address] = {
-                "user_name": username,
-                "message": message,
-                # datetime.datetime.now() は、現在日時を取得する。
-                "last_seen": datetime.datetime.now(),
-                "failed_count": 0
-            }
+            with lock:
+                clients[address] = {
+                    "user_name": username,
+                    "message": message,
+                    # datetime.datetime.now() は、現在日時を取得する。
+                    "last_seen": datetime.datetime.now(),
+                    "failed_count": 0
+                }
 
             # 全クライアントに送信。
             for client in list(clients.keys()):
@@ -61,12 +63,13 @@ def cleanup_clients(clients, timeout=60):
     while True:
         now = datetime.datetime.now()
         remove_list = []
-        for address, information in list(clients.items()):
-            if (now - information["last_seen"]).total_seconds() > timeout:
-                remove_list.append(address)
-        for addr in remove_list:
-            print(f'Removing {addr} due to inactivity')
-            del clients[addr]
+        with lock:
+            for address, information in list(clients.items()):
+                if (now - information["last_seen"]).total_seconds() > timeout:
+                    remove_list.append(address)
+            for addr in remove_list:
+                print(f'Removing {addr} due to inactivity')
+                del clients[addr]
         time.sleep(10)
 
 if __name__ == "__main__":
