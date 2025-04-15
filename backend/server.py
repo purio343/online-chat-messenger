@@ -2,12 +2,14 @@ import socket
 import datetime
 import time
 import threading
+import uuid
 
 server_address = '0.0.0.0'
 port = 9001
 rate = 4096
 max_fails = 3
 clients = {}
+clients_tokens = {}
 timeout = 60
 lock = threading.Lock()
 
@@ -72,6 +74,51 @@ def cleanup_clients(clients, timeout=60):
                 print(f'Removing {addr} due to inactivity')
                 del clients[addr]
         time.sleep(10)
+
+def tcp_handler():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind((server_address, port))
+    sock.listen(5)
+
+    while True:
+        connection, address = sock.accept()
+        print(f'Connection from {address}')
+        try:
+            header = connection.recv(32)
+            roomname_length = int.from_bytes(header[:1], 'big')
+            operation = int.from_bytes(header[1:2], 'big')
+            state = int.from_bytes(header[2:3], 'big')
+            operation_payload_length = int.from_bytes(header[3:32], 'big')
+            
+            roomname = connection.recv(roomname_length).decode('utf-8')
+            operation_payload = connection.recv(operation_payload_length)
+
+            # operationに応じた処理を行う。
+            # 1: Create Room
+            # 2: Join Room
+            if operation == 1:
+                print(f'Creating room {roomname}')
+                username = operation_payload.decode('utf-8')
+                client_token = uuid.uuid4()
+                create_room(connection, address, client_token)
+                clients_tokens[client_token] = {
+                    "user_name": username
+                }
+            elif operation == 2:
+                print(f'Joining room {roomname}')
+
+        except Exception as e:
+            print(f'An error occurred: {e}')
+        finally:
+            connection.close()
+            print('Connection closed')
+
+def create_room(connection, address, token):
+    status_code = str(200).to_bytes(1, 'big')
+    token = token.bytes()
+    # 17バイト
+    data = status_code + token
+    connection.send(data, address)
 
 if __name__ == "__main__":
     main()

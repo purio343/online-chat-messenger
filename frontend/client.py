@@ -49,5 +49,12 @@ def listen(sock, rate, name):
 def protocol_header(username_length):
     return username_length.to_bytes(1, 'big')
 
+def chatroom_protocol_header(roomname_length, operation_length, state_length, operation_payload_length):
+    header = roomname_length.to_bytes(1, 'big')
+    header += operation_length.to_bytes(1, 'big')
+    header += state_length.to_bytes(1, 'big')
+    header += operation_payload_length.to_bytes(29, 'big')
+    return header
+
 if __name__ == "__main__":
     main()
