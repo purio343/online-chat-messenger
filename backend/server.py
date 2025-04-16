@@ -9,7 +9,7 @@ port = 9001
 rate = 4096
 max_fails = 3
 clients = {}
-clients_tokens = {}
+rooms = {}
 timeout = 60
 lock = threading.Lock()
 
@@ -99,13 +99,14 @@ def tcp_handler():
             if operation == 1:
                 print(f'Creating room {roomname}')
                 username = operation_payload.decode('utf-8')
-                client_token = uuid.uuid4()
-                create_room(connection, address, client_token)
-                clients_tokens[client_token] = {
-                    "user_name": username
-                }
+                create_room(connection, address, username, roomname)
             elif operation == 2:
+                if roomname not in rooms:
+                    connection.close()
+                    return
                 print(f'Joining room {roomname}')
+                username = operation_payload.decode('utf-8')
+                join_room(connection, address, username, roomname)
 
         except Exception as e:
             print(f'An error occurred: {e}')
@@ -113,7 +114,24 @@ def tcp_handler():
             connection.close()
             print('Connection closed')
 
-def create_room(connection, address, token):
+def create_room(connection, address, username, roomname):
+    client_token = uuid.uuid4()
+    rooms[roomname]["host"][address] = {
+        "user_name": username,
+        "client_token": client_token
+    }
+    send_token(connection, address, client_token)
+
+def join_room(connection, address, username, roomname):
+    client_token = uuid.uuid4()
+    # ゲスト（ホスト以外のユーザー）として部屋に追加
+    rooms[roomname]["guest"][address] ={
+        "user_name": username,
+        "client_token": client_token,
+    }
+    send_token(connection, address, client_token)
+
+def send_token(connection, address, token):
     status_code = str(200).to_bytes(1, 'big')
     token = token.bytes()
     # 17バイト
