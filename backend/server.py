@@ -14,71 +14,27 @@ timeout = 60
 lock = threading.Lock()
 
 def main():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    threading.Thread(target=cleanup_clients, args=(clients, timeout), daemon=True).start()
-    sock.bind((server_address, port))
-    # クライアントの情報を連想配列で保持。
-    
-    print(f'Server started on {server_address}:{port}')
-
-    while True:
-        # sock.recvfrom() はバイト列を返す。
-        try:
-            data, address = sock.recvfrom(rate)
-
-            print(f"Received {len(data)} bytes from {address}")
-
-            username_length = int.from_bytes(data[:1], 'big') 
-            username = data[1:username_length + 1].decode('utf-8')
-            message = data[username_length + 1:].decode('utf-8')
-
-            # クライアント情報を更新、または追加。
-            with lock:
-                clients[address] = {
-                    "user_name": username,
-                    "message": message,
-                    # datetime.datetime.now() は、現在日時を取得する。
-                    "last_seen": datetime.datetime.now(),
-                    "failed_count": 0
-                }
-
-            # 全クライアントに送信。
-            for client in list(clients.keys()):
-                try:
-                    if client != address:
-                        sock.sendto(data, client)
-                except Exception as e:
-                    print(f'Error sending to {client}: {e}')
-                    clients[client]["failed_count"] += 1
-                    if clients[client]["failed_count"] >= max_fails:
-                        print(f'Removing {client} due to too many failures')
-                        del clients[client]
-
-        except KeyboardInterrupt:
-            print('Server shutting down')
-            break
-
-        except Exception as e:
-            print(f'Server error: {e}')
+    tcp_handler()
 
 # 各クライアントの最終更新日時を取得して、一定時間送信していない場合は管理用の連想配列から削除
-def cleanup_clients(clients, timeout=60):
-    while True:
-        now = datetime.datetime.now()
-        remove_list = []
-        with lock:
-            for address, information in list(clients.items()):
-                if (now - information["last_seen"]).total_seconds() > timeout:
-                    remove_list.append(address)
-            for addr in remove_list:
-                print(f'Removing {addr} due to inactivity')
-                del clients[addr]
-        time.sleep(10)
+# def cleanup_clients(clients, timeout=60):
+#     while True:
+#         now = datetime.datetime.now()
+#         remove_list = []
+#         with lock:
+#             for address, information in list(clients.items()):
+#                 if (now - information["last_seen"]).total_seconds() > timeout:
+#                     remove_list.append(address)
+#             for addr in remove_list:
+#                 print(f'Removing {addr} due to inactivity')
+#                 del clients[addr]
+#         time.sleep(10)
 
 def tcp_handler():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind((server_address, port))
     sock.listen(5)
+    print(f'Server is runnning on {server_address}:{port}')
 
     while True:
         connection, address = sock.accept()
@@ -99,6 +55,8 @@ def tcp_handler():
             if operation == 1:
                 print(f'Creating room {roomname}')
                 username = operation_payload.decode('utf-8')
+                print(f'Username: {username}')
+                print(f'Roomname: {roomname}')
                 create_room(connection, address, username, roomname)
             elif operation == 2:
                 if roomname not in rooms:
@@ -115,28 +73,46 @@ def tcp_handler():
             print('Connection closed')
 
 def create_room(connection, address, username, roomname):
-    client_token = uuid.uuid4()
-    rooms[roomname]["host"][address] = {
-        "user_name": username,
-        "client_token": client_token
-    }
-    send_token(connection, address, client_token)
+    try:
+        client_token = uuid.uuid4()
+        # 部屋が存在しない場合、部屋を新規に作成。
+        if roomname not in rooms:
+            rooms[roomname] = {
+                "host": {},
+                "guest": {}
+            }
+        # 作成した部屋にホストとして追加。
+        rooms[roomname]["host"][address] = {
+            "user_name": username,
+            "client_token": client_token
+        }
+        print(f'client_token: {client_token}')
+        send_token(connection, client_token, 1)
+    except Exception as e:
+        print(f'Error creating: {e.__traceback__}')
 
 def join_room(connection, address, username, roomname):
-    client_token = uuid.uuid4()
-    # ゲスト（ホスト以外のユーザー）として部屋に追加
-    rooms[roomname]["guest"][address] ={
-        "user_name": username,
-        "client_token": client_token,
-    }
-    send_token(connection, address, client_token)
+    try:
+        client_token = uuid.uuid4()
+        # ゲスト（ホスト以外のユーザー）として部屋に追加
+        rooms[roomname]["guest"][address] ={
+            "user_name": username,
+            "client_token": client_token,
+        }
+        send_token(connection, client_token, 2)
+    except Exception as e:
+        print(f'Error joinging room: {e.__traceback__}')
 
-def send_token(connection, address, token):
-    status_code = str(200).to_bytes(1, 'big')
-    token = token.bytes()
-    # 17バイト
-    data = status_code + token
-    connection.send(data, address)
+def send_token(connection, token_row, status_code):
+    try:
+        status = status_code.to_bytes(1, 'big')
+        # token は16バイト
+        token = token_row.bytes
+        # data は17バイト
+        data = status + token
+        connection.send(data)
+    except Exception as e:
+        print(f'Error sending token: {e.__class__.__name__}: {str(e)}')
 
 if __name__ == "__main__":
     main()
