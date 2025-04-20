@@ -6,6 +6,7 @@ import uuid
 
 server_address = '0.0.0.0'
 port = 9001
+udp_port = 9002
 rate = 4096
 max_fails = 3
 clients = {}
@@ -15,6 +16,7 @@ lock = threading.Lock()
 
 def main():
     tcp_handler()
+    udp_handler()
 
 # 各クライアントの最終更新日時を取得して、一定時間送信していない場合は管理用の連想配列から削除
 # def cleanup_clients(clients, timeout=60):
@@ -29,6 +31,27 @@ def main():
 #                 print(f'Removing {addr} due to inactivity')
 #                 del clients[addr]
 #         time.sleep(10)
+
+def udp_handler():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind((server_address, udp_port))
+    print('UDP server is running')
+    while True:
+        try:
+            data, address = sock.recvfrom(rate)
+            # ヘッダーは2バイト。
+            # 1バイト目は部屋名の長さ。
+            # 2バイト目はトークンの長さ。
+            header = data[:2]
+            body = data[2:]
+            roomname_length = int.from_bytes(header[:1], 'big')
+            token_length = int.from_bytes(header[1:2], 'big')
+            roomname = body[:roomname_length].decode('utf-8')
+            token = body[roomname_length:token_length].decode('utf-8')
+            message = body[token_length:].decode('utf-8')
+        except Exception as e:
+            print(f'UDP error: {str(e)}')
+
 
 def tcp_handler():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

@@ -41,6 +41,11 @@ def chatroom_protocol_header(roomname_length, operation, state, operation_payloa
     header += operation_payload_length.to_bytes(29, 'big')
     return header
 
+def chat_protocol_header(roomname_length, token_length):
+    header = roomname_length.to_bytes(1, 'big')
+    header += token_length.to_bytes(1, 'big')
+    return header
+
 def tcp_connection():
     
     server_address = input('Type in the server address:')
