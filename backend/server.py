@@ -15,8 +15,11 @@ timeout = 60
 lock = threading.Lock()
 
 def main():
-    tcp_handler()
-    udp_handler()
+    tcp_thread = threading.Thread(target=tcp_handler, daemon=True)
+    tcp_thread.start()
+    tcp_thread.join()
+    # udp_handler()
+    
 
 # 各クライアントの最終更新日時を取得して、一定時間送信していない場合は管理用の連想配列から削除
 # def cleanup_clients(clients, timeout=60):
@@ -76,17 +79,15 @@ def tcp_handler():
             # 1: Create Room
             # 2: Join Room
             if operation == 1:
-                print(f'Creating room {roomname}')
                 username = operation_payload.decode('utf-8')
-                print(f'Username: {username}')
-                print(f'Roomname: {roomname}')
+                print(f'Creating room {roomname} by {username}')
                 create_room(connection, address, username, roomname)
             elif operation == 2:
+                username = operation_payload.decode('utf-8')
                 if roomname not in rooms:
                     connection.close()
                     return
-                print(f'Joining room {roomname}')
-                username = operation_payload.decode('utf-8')
+                print(f'Joining {roomname} by {username}')
                 join_room(connection, address, username, roomname)
 
         except Exception as e:
