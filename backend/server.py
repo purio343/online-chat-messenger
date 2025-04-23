@@ -29,10 +29,11 @@ def main():
 def udp_handler():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((server_address, udp_port))
-    print('UDP server is running')
+    print(f'UDP server is runnning on {server_address}:{udp_port}')
     while True:
         try:
             data, address = sock.recvfrom(rate)
+            print(f'UDP message received from {address}')
             # ヘッダーは2バイト。
             # 1バイト目は部屋名の長さ。
             # 2バイト目はトークンの長さ。
@@ -40,9 +41,14 @@ def udp_handler():
             body = data[2:]
             roomname_length = int.from_bytes(header[:1], 'big')
             token_length = int.from_bytes(header[1:2], 'big')
+            print(f'roomname_length: {roomname_length}')
+            print(f'token_length: {token_length}')
             roomname = body[:roomname_length].decode('utf-8')
-            token = body[roomname_length:token_length].decode('utf-8')
-            message = body[token_length:].decode('utf-8')
+            print(f'roomname: {roomname}')
+            token = body[roomname_length:roomname_length + token_length]
+            print(f'token: {uuid.UUID(bytes=token)}')
+            message = body[roomname_length + token_length:].decode('utf-8')
+            print(f'message: {message}')
             if authentication_token(roomname, address, token):
                 send_message(roomname, message, sock)
         except Exception as e:
@@ -53,7 +59,7 @@ def tcp_handler():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind((server_address, port))
     sock.listen(5)
-    print(f'Server is runnning on {server_address}:{port}')
+    print(f'TCP server is runnning on {server_address}:{port}')
 
     while True:
         connection, address = sock.accept()
@@ -87,7 +93,7 @@ def tcp_handler():
             print(f'An error occurred: {e}')
         finally:
             connection.close()
-            print('Connection closed')
+            print('TCP connection closed')
 
 def create_room(connection, address, username, roomname):
     try:
@@ -106,6 +112,7 @@ def create_room(connection, address, username, roomname):
                 "last_seen": datetime.datetime.now()
             }
         print(f'client_token: {client_token}')
+        print(f'rooms: {rooms}')
         send_token(connection, client_token, 1)
     except Exception as e:
         print(f'Error creating: {e.__traceback__}')
@@ -138,15 +145,19 @@ def send_token(connection, token_row, status_code):
 # udp接続時の認証
 def authentication_token(roomname, address, token):
     if roomname not in rooms:
+        print(f'Room {roomname} is not found')
         return False
-    if address not in rooms[roomname]["host"] or address not in rooms[roomname]["guest"]:
-        return False
-    #　クライアントから送信されたトークンが一致した場合TRUEを返す。
+    
+    #　クライアント（ゲスト）から送信されたトークンが一致した場合Trueを返す。
     if address in rooms[roomname]["guest"]:
-        if rooms[roomname]["guest"][address]["client_token"] == token:
-            return True
-        else:
-            return False
+        return rooms[roomname]["guest"][address]["client_token"] == uuid.UUID(bytes=token)
+    
+    # クライアント（ホスト）から送信されたトークンが一致した場合Trueを返す。
+    if address in rooms[roomname]["host"]:
+        return rooms[roomname]["host"][address]["client_token"] == uuid.UUID(bytes=token)
+    
+    print(f'Address {address} is not found in {roomname}')
+    return False
 
 # その部屋に属するユーザーにメッセージを送信する処理
 def send_message(roomname, message, sock):
@@ -155,16 +166,17 @@ def send_message(roomname, message, sock):
         if roomname not in rooms:
             raise Exception(f'room {roomname} is not found')
         
+        print(f'Sending message to {roomname}')
         # その部屋のホストにメッセージを送信
         for address in rooms[roomname]["host"]:
             try:
-                sock.sendto(message, address)
+                sock.sendto(message.encode('utf-8'), address)
             except Exception as e:
                 print(f'Error sending message to {address}')
         # その部屋のゲストにメッセージを送信
         for address in rooms[roomname]["guest"]:
             try:
-                sock.sendto(message, address)
+                sock.sendto(message.encode('utf-8'), address)
             except Exception as e:
                 print(f'Error sending message to {address}')
     except Exception as e:
@@ -174,8 +186,6 @@ def send_message(roomname, message, sock):
 def cleanup_clients(rooms, timeout=60):
     while True:
         now = datetime.datetime.now()
-        remove_host = []
-        remove_guest = []
         with lock:
             for roomname, information in list(rooms.items()):
                 for address, user in list(information["host"].items()):
