@@ -20,11 +20,11 @@ def main():
     cleanup_thread = threading.Thread(target=cleanup_clients, daemon=True, args=(rooms, timeout))
     tcp_thread.start()
     udp_thread.start()
-    cleanup_thread.start()
+    # cleanup_thread.start()
     # tcp_threadが終了するまで待機
     tcp_thread.join()
     udp_thread.join()
-    cleanup_thread.join()
+    # cleanup_thread.join()
 
 def udp_handler():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -166,6 +166,9 @@ def send_message(roomname, message, sock):
         if roomname not in rooms:
             raise Exception(f'room {roomname} is not found')
         
+         # メッセージ送信前に部屋情報を表示（デバッグ用）
+        print(f'Before sending - rooms content: {rooms}')
+
         print(f'Sending message to {roomname}')
         # その部屋のホストにメッセージを送信
         for address in rooms[roomname]["host"]:
@@ -179,6 +182,8 @@ def send_message(roomname, message, sock):
                 sock.sendto(message.encode('utf-8'), address)
             except Exception as e:
                 print(f'Error sending message to {address}')
+         # メッセージ送信前に部屋情報を表示（デバッグ用）
+        print(f'After sending - rooms content: {rooms}')
     except Exception as e:
         print(f'An error occurred sending message: {str(e)}')
 

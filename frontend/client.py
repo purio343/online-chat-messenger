@@ -17,10 +17,8 @@ token_size = 17
 rate = 4094
 
 def main():
-    client_token = tcp_connection()
-    udp_connection(client_token)
-# def protocol_header(username_length):
-#     return username_length.to_bytes(1, 'big')
+    client_token, roomname = tcp_connection()
+    udp_connection(client_token, roomname)
 
 def chatroom_protocol_header(roomname_length, operation, state, operation_payload_length):
     header = roomname_length.to_bytes(1, 'big')
@@ -68,18 +66,18 @@ def tcp_connection():
         
         token = uuid.UUID(bytes=data[1:])
         print(f'Your token is {token}')
-        return token
+        return [token, roomname]
     except Exception as e:
         print(f'Error receiving data: {e}')
     finally:
         sock.close()
 
-def udp_connection(token):
+def udp_connection(token, roomname):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((client_address, client_port))
     try:
         listen_thread = threading.Thread(target=recieve_message, args=(sock, rate), daemon=True)
-        send_thread = threading.Thread(target=send_message, args=(sock, token), daemon=True)
+        send_thread = threading.Thread(target=send_message, args=(sock, token, roomname), daemon=True)
         listen_thread.start()
         send_thread.start()
         listen_thread.join()
@@ -103,16 +101,16 @@ def recieve_message(sock, rate):
             message = data.decode('utf-8')
             now = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
             print(f'{now} {message}')
+            print(">", end="", flush=True)
     except KeyboardInterrupt:
-        print('Chat closed')
+        print('\nChat closed')
     except Exception as e:
-        print(f'An error occured: {str(e)}')
+        print(f'\nAn error occured: {str(e)}')
 
-def send_message(sock, token):
+def send_message(sock, token, roomname):
     while True:
-        message = input("Type in your message:").encode('utf-8')
-        roomname = input("Type in the room name you want to join:").encode('utf-8')
-
+        print(">", end="", flush=True)
+        message = input().encode('utf-8')
         # UUIDのバイト列は16バイト
         token_bytes = token.bytes
         header = send_message_header_protocol(len(roomname), len(token_bytes))
@@ -120,7 +118,6 @@ def send_message(sock, token):
         data = header + body
         try:
             sock.sendto(data, (server_address, udp_port))
-            print(f'Message sent to {roomname}')
         except Exception as e:
             print(f'Error sending data: {str(e)}')
 
