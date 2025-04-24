@@ -149,12 +149,15 @@ def authentication_token(roomname, address, token):
         return False
     
     #　クライアント（ゲスト）から送信されたトークンが一致した場合Trueを返す。
-    if address in rooms[roomname]["guest"]:
-        return rooms[roomname]["guest"][address]["client_token"] == uuid.UUID(bytes=token)
-    
-    # クライアント（ホスト）から送信されたトークンが一致した場合Trueを返す。
-    if address in rooms[roomname]["host"]:
-        return rooms[roomname]["host"][address]["client_token"] == uuid.UUID(bytes=token)
+    with lock:
+        if address in rooms[roomname]["guest"]:
+            rooms[roomname]["guest"][address]["last_seen"] == datetime.datetime.now()
+            return rooms[roomname]["guest"][address]["client_token"] == uuid.UUID(bytes=token)
+        
+        # クライアント（ホスト）から送信されたトークンが一致した場合Trueを返す。
+        if address in rooms[roomname]["host"]:
+            rooms[roomname]["host"][address]["last_seen"] == datetime.datetime.now()
+            return rooms[roomname]["host"][address]["client_token"] == uuid.UUID(bytes=token)
     
     print(f'Address {address} is not found in {roomname}')
     return False
