@@ -12,6 +12,8 @@ max_fails = 3
 clients = {}
 rooms = {}
 timeout = 60
+max_rooms = 100
+max_users_per_room = 50
 lock = threading.Lock()
 
 def main():
@@ -58,7 +60,7 @@ def udp_handler():
 def tcp_handler():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind((server_address, port))
-    sock.listen(5)
+    sock.listen(1000)
     print(f'TCP server is runnning on {server_address}:{port}')
 
     while True:
@@ -96,6 +98,11 @@ def tcp_handler():
             print('TCP connection closed')
 
 def create_room(connection, address, username, roomname):
+    if len(rooms) >= max_rooms:
+        raise Exception('Too many rooms')
+    if roomname in rooms and len(rooms[roomname]["guest"]) >= max_users_per_room:
+        raise Exception('Too many users in the room')
+    
     try:
         client_token = uuid.uuid4()
         # 部屋が存在しない場合、部屋を新規に作成。
