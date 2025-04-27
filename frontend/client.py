@@ -5,20 +5,20 @@ import datetime
 import uuid
 import random
 
-def create_port_number():
-    return random.randint(49152, 65535)
+# def create_port_number():
+#     return random.randint(49152, 65535)
 
 server_address = "0.0.0.0"
 server_port = 9001
 udp_port = 9002
 client_address = ''
-client_port = create_port_number()
+# client_port = create_port_number()
 token_size = 17
 rate = 4094
 
 def main():
-    client_token, roomname = tcp_connection()
-    udp_connection(client_token, roomname)
+    client_token, roomname, actual_port = tcp_connection()
+    udp_connection(client_token, roomname, actual_port)
 
 def chatroom_protocol_header(roomname_length, operation, state, operation_payload_length):
     header = roomname_length.to_bytes(1, 'big')
@@ -41,7 +41,9 @@ def tcp_connection():
     header = chatroom_protocol_header(len(roomname), int(operation), 200, len(name))
     body = roomname + name
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind((client_address, client_port))
+    sock.bind((client_address, 0))
+    # TCPで使用されたポート番号を取得
+    actual_port = sock.getsockname()[1]
 
     try:
         sock.connect((server_address, server_port))
@@ -62,19 +64,21 @@ def tcp_connection():
         elif status_code == 2:
             print('Joined room successfully')
         else:
-            print('Failed to create room')
+            print('Failed to create/join room.')
+            sys.exit(1)
         
         token = uuid.UUID(bytes=data[1:])
         print(f'Your token is {token}')
-        return [token, roomname]
+        return [token, roomname, actual_port]
     except Exception as e:
         print(f'Error receiving data: {e}')
     finally:
         sock.close()
 
-def udp_connection(token, roomname):
+def udp_connection(token, roomname, actual_port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((client_address, client_port))
+    # TCPのソケットと同じポートを使用
+    sock.bind((client_address, actual_port))
     try:
         listen_thread = threading.Thread(target=recieve_message, args=(sock, rate), daemon=True)
         send_thread = threading.Thread(target=send_message, args=(sock, token, roomname), daemon=True)

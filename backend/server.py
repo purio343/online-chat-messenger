@@ -8,7 +8,6 @@ server_address = '0.0.0.0'
 port = 9001
 udp_port = 9002
 rate = 4096
-max_fails = 3
 clients = {}
 rooms = {}
 timeout = 60
@@ -76,6 +75,8 @@ def tcp_handler():
             roomname = connection.recv(roomname_length).decode('utf-8')
             operation_payload = connection.recv(operation_payload_length)
 
+            print(f'address: {address}')
+            print(f'operation: {operation}')
             # operationに応じた処理を行う。
             # 1: Create Room
             # 2: Join Room
@@ -86,8 +87,13 @@ def tcp_handler():
             elif operation == 2:
                 username = operation_payload.decode('utf-8')
                 if roomname not in rooms:
+                    print(f'Room {roomname} is not found')
+                    # 部屋が見つからなかった時用
+                    status_code = 3
+                    token = uuid.uuid4().bytes
+                    connection.send(status_code.to_bytes(1, 'big') + token)
                     connection.close()
-                    return
+                    continue
                 print(f'Joining {roomname} by {username}')
                 join_room(connection, address, username, roomname)
 
@@ -158,12 +164,12 @@ def authentication_token(roomname, address, token):
     #　クライアント（ゲスト）から送信されたトークンが一致した場合Trueを返す。
     with lock:
         if address in rooms[roomname]["guest"]:
-            rooms[roomname]["guest"][address]["last_seen"] == datetime.datetime.now()
+            rooms[roomname]["guest"][address]["last_seen"] = datetime.datetime.now()
             return rooms[roomname]["guest"][address]["client_token"] == uuid.UUID(bytes=token)
         
         # クライアント（ホスト）から送信されたトークンが一致した場合Trueを返す。
         if address in rooms[roomname]["host"]:
-            rooms[roomname]["host"][address]["last_seen"] == datetime.datetime.now()
+            rooms[roomname]["host"][address]["last_seen"] = datetime.datetime.now()
             return rooms[roomname]["host"][address]["client_token"] == uuid.UUID(bytes=token)
     
     print(f'Address {address} is not found in {roomname}')
@@ -207,7 +213,8 @@ def cleanup_clients(rooms, timeout=60):
                     if (now - user["last_seen"]).total_seconds() > timeout:
                         del information["host"][address]
                         # ホストが削除された場合、部屋ごと削除？
-                        # del rooms[roomname]
+                        if not information["host"]: 
+                            del rooms[roomname]
                 for address, user in list(information["guest"].items()):
                     if (now - user["last_seen"]).total_seconds() > timeout:
                         del information["guest"][address]            
