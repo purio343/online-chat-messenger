@@ -3,16 +3,22 @@ import datetime
 import time
 import threading
 import uuid
+import json
 
-server_address = '0.0.0.0'
-port = 9001
-udp_port = 9002
-rate = 4096
+with open('config.json', 'r') as f:
+    config = json.load(f)
+
+server_address = config['server_address']
+tcp_port = config["tcp_port"]
+udp_port = config["udp_port"]
+rate = config["udp_buffer_size"]
+timeout = config["timeout"]
+max_rooms = config["max_rooms"]
+max_users_per_room = config["max_users_per_room"]
+
 clients = {}
 rooms = {}
-timeout = 60
-max_rooms = 100
-max_users_per_room = 50
+
 lock = threading.Lock()
 
 def main():
@@ -58,9 +64,9 @@ def udp_handler():
 
 def tcp_handler():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind((server_address, port))
+    sock.bind((server_address, tcp_port))
     sock.listen(1000)
-    print(f'TCP server is runnning on {server_address}:{port}')
+    print(f'TCP server is runnning on {server_address}:{tcp_port}')
 
     while True:
         connection, address = sock.accept()
