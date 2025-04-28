@@ -3,18 +3,17 @@ import threading
 import sys
 import datetime
 import uuid
-import random
+import json
 
-# def create_port_number():
-#     return random.randint(49152, 65535)
+with open('config.json', 'r') as f:
+    config = json.load(f)
 
-server_address = "0.0.0.0"
-server_port = 9001
-udp_port = 9002
-client_address = ''
-# client_port = create_port_number()
-token_size = 17
-rate = 4094
+server_address = config["server_address"]
+client_address = config["client_address"]
+tcp_port = config["tcp_port"]
+udp_port = config["udp_port"]
+token_size = config["token_size"]
+rate = config["rate"]
 
 def main():
     client_token, roomname, actual_port = tcp_connection()
@@ -46,7 +45,7 @@ def tcp_connection():
     actual_port = sock.getsockname()[1]
 
     try:
-        sock.connect((server_address, server_port))
+        sock.connect((server_address, tcp_port))
     except Exception as e:
         print(f'Error connecting to the server: {e}')
 
