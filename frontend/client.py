@@ -36,6 +36,10 @@ def tcp_connection():
     name = input('Type in your name:').encode('utf-8')
     roomname = input('Type in the room name:').encode('utf-8')
     operation = input('Type in the operation:').encode('utf-8')
+    # 無効なオペレーションの場合、終了
+    if not is_operation_valid(operation):
+        print('Invalid operation')
+        sys.exit(1)
     # 部屋作成のリクエストを送信する時、ペイロードにはユーザー名が含まれる。
     header = chatroom_protocol_header(len(roomname), int(operation), 200, len(name))
     body = roomname + name
@@ -124,7 +128,8 @@ def send_message(sock, token, roomname):
         except Exception as e:
             print(f'Error sending data: {str(e)}')
 
-
+def is_operation_valid(operation):
+    return operation in [b'1', b'2']
 
 if __name__ == "__main__":
     main()
