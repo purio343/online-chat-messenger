@@ -33,13 +33,16 @@ def chat_protocol_header(roomname_length, token_length):
 
 def tcp_connection():
     
-    name = input('Type in your name:').encode('utf-8')
-    roomname = input('Type in the room name:').encode('utf-8')
+    name_string = input('Type in your name:')
+    roomname_string = input('Type in the room name:')
     operation = input('Type in the operation:').encode('utf-8')
-    # 無効なオペレーションの場合、終了
-    if not is_operation_valid(operation):
-        print('Invalid operation')
+    if not is_input_valid(name_string, roomname_string, operation):
         sys.exit(1)
+
+    name = name_string.encode('utf-8')
+    roomname = roomname_string.encode('utf-8')
+    # 無効なオペレーションの場合、終了
+    
     # 部屋作成のリクエストを送信する時、ペイロードにはユーザー名が含まれる。
     header = chatroom_protocol_header(len(roomname), int(operation), 200, len(name))
     body = roomname + name
@@ -130,6 +133,25 @@ def send_message(sock, token, roomname):
 
 def is_operation_valid(operation):
     return operation in [b'1', b'2']
+
+def is_name_valid(name):
+    return len(name) <= 10 and len(name) >= 1
+
+def is_roomname_valid(roomname):
+    return len(roomname) <= 15 and len(roomname) >= 1
+
+def is_input_valid(name, roomname, operation):
+    flag = True
+    if not is_name_valid(name):
+        print('Invalid name')
+        flag = False
+    if not is_roomname_valid(roomname):
+        print('Invalid room name')
+        flag = False
+    if not is_operation_valid(operation):
+        print('Invalid operation')
+        flag = False
+    return flag
 
 if __name__ == "__main__":
     main()
