@@ -1,0 +1,12 @@
+{
+  "server_address": "0.0.0.0",
+  "client_address": "",
+  "tcp_port": 9001,
+  "udp_port": 9002,
+  "token_size": 17,
+  "rate": 4094,
+  "udp_buffer_size": 4096,
+  "timeout": 60,
+  "max_rooms": 100,
+  "max_users_per_room": 50
+}
