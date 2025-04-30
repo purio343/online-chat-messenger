@@ -32,13 +32,14 @@ def chat_protocol_header(roomname_length, token_length):
     return header
 
 def tcp_connection():
-    
-    name_string = input('Type in your name:')
-    roomname_string = input('Type in the room name:')
-    operation = input('Type in the operation:').encode('utf-8')
-    if not is_input_valid(name_string, roomname_string, operation):
-        sys.exit(1)
-
+    while True:
+        name_string = input('Type in your name:')
+        roomname_string = input('Type in the room name:')
+        operation = input('Type in the operation:').encode('utf-8')
+        if is_input_valid(name_string, roomname_string, operation):
+            break
+        else:
+            print('Try agein')
     name = name_string.encode('utf-8')
     roomname = roomname_string.encode('utf-8')
     # 無効なオペレーションの場合、終了
