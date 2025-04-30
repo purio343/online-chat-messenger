@@ -104,14 +104,24 @@ def send_message_header_protocol(roomname_length, token_length):
 
 # メッセージ受信スレッド
 def recieve_message(sock, rate):
+    # タイムアウトを設定。1秒経過すると例外が発生。
+    sock.settimeout(1.0)
+
     try:
         while True:
-            # dataにヘッダーは含まれていない
-            data, server = sock.recvfrom(rate)
-            message = data.decode('utf-8')
-            now = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
-            print(f'{now} {message}')
-            print(">", end="", flush=True)
+            try:
+                # dataにヘッダーは含まれていない
+                data, server = sock.recvfrom(rate)
+                message = data.decode('utf-8')
+                now = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
+                print(f'{now} {message}')
+                print(">", end="", flush=True)
+            # タイムアウトでループ継続
+            except socket.timeout:
+                continue
+            # sock.close()でソケットが閉じられた場合、終了
+            except OSError:
+                break
     except KeyboardInterrupt:
         print('\nChat closed')
     except Exception as e:
@@ -120,11 +130,19 @@ def recieve_message(sock, rate):
 def send_message(sock, token, roomname):
     while True:
         print(">", end="", flush=True)
-        message = input().encode('utf-8')
+        # message = input().encode('utf-8')
+        message = input()
+        # /quitで、チャットを抜ける
+        if message.strip() == "/quit":
+            print("Chat closed")
+            sock.close()
+            break
+
+        message_bytes = message.encode('utf-8')
         # UUIDのバイト列は16バイト
         token_bytes = token.bytes
         header = send_message_header_protocol(len(roomname), len(token_bytes))
-        body = roomname + token_bytes + message
+        body = roomname + token_bytes + message_bytes
         data = header + body
         try:
             sock.sendto(data, (server_address, udp_port))
