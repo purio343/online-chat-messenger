@@ -72,14 +72,14 @@ def tcp_handler():
         connection, address = sock.accept()
         print(f'Connection from {address}')
         try:
-            header = connection.recv(32)
+            header = recv_all(connection, 32)
             roomname_length = int.from_bytes(header[:1], 'big')
             operation = int.from_bytes(header[1:2], 'big')
             state = int.from_bytes(header[2:3], 'big')
             operation_payload_length = int.from_bytes(header[3:32], 'big')
             
-            roomname = connection.recv(roomname_length).decode('utf-8')
-            operation_payload = connection.recv(operation_payload_length)
+            roomname = recv_all(connection, roomname_length).decode('utf-8')
+            operation_payload = recv_all(connection, operation_payload_length)
 
             print(f'address: {address}')
             print(f'operation: {operation}')
@@ -108,6 +108,16 @@ def tcp_handler():
         finally:
             connection.close()
             print('TCP connection closed')
+
+def recv_all(connection, size):
+    data = b''
+    if len(data) < size:
+        chunk = connection.recv(size - len(data))
+        if not chunk:
+            raise Exception('Connection is closed')
+        data += chunk
+
+    return data
 
 def create_room(connection, address, username, roomname):
     if len(rooms) >= max_rooms:

@@ -35,7 +35,7 @@ def tcp_connection():
     while True:
         name_string = input('Type in your name:')
         roomname_string = input('Type in the room name:')
-        operation = input('Type in the operation:').encode('utf-8')
+        operation = input('Type in the operation (1=create, 2=join):').encode('utf-8')
         if is_input_valid(name_string, roomname_string, operation):
             break
         else:
@@ -64,7 +64,7 @@ def tcp_connection():
         print(f'Error sending data: {e}')
     
     try:
-        data = sock.recv(token_size)
+        data = recv_all(sock, token_size)
         status_code = int.from_bytes(data[:1], 'big')
         if status_code == 1:
             print('Room created successfully')
@@ -81,6 +81,16 @@ def tcp_connection():
         print(f'Error receiving data: {e}')
     finally:
         sock.close()
+
+def recv_all(socket, size):
+    data = b''
+    while len(data) < size:
+        chunk = socket.recv(size - len(data))
+        if not chunk:
+            raise Exception('Connection is closed')
+        data += chunk
+
+    return data
 
 def udp_connection(token, roomname, actual_port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
