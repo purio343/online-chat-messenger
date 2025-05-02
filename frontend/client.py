@@ -16,8 +16,8 @@ token_size = config["token_size"]
 rate = config["rate"]
 
 def main():
-    client_token, roomname, actual_port = tcp_connection()
-    udp_connection(client_token, roomname, actual_port)
+    client_token, roomname, actual_port, name = tcp_connection()
+    udp_connection(client_token, roomname, actual_port, name)
 
 def chatroom_protocol_header(roomname_length, operation, state, operation_payload_length):
     header = roomname_length.to_bytes(1, 'big')
@@ -76,7 +76,7 @@ def tcp_connection():
         
         token = uuid.UUID(bytes=data[1:])
         print(f'Your token is {token}')
-        return [token, roomname, actual_port]
+        return [token, roomname, actual_port, name]
     except Exception as e:
         print(f'Error receiving data: {e}')
     finally:
@@ -92,13 +92,13 @@ def recv_all(socket, size):
 
     return data
 
-def udp_connection(token, roomname, actual_port):
+def udp_connection(token, roomname, actual_port, name):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     # TCPのソケットと同じポートを使用
     sock.bind((client_address, actual_port))
     try:
         listen_thread = threading.Thread(target=recieve_message, args=(sock, rate), daemon=True)
-        send_thread = threading.Thread(target=send_message, args=(sock, token, roomname), daemon=True)
+        send_thread = threading.Thread(target=send_message, args=(sock, token, roomname, name), daemon=True)
         listen_thread.start()
         send_thread.start()
         listen_thread.join()
@@ -108,9 +108,10 @@ def udp_connection(token, roomname, actual_port):
     finally:
         sock.close()
 
-def send_message_header_protocol(roomname_length, token_length):
+def send_message_header_protocol(roomname_length, token_length, name_length):
     header = roomname_length.to_bytes(1, 'big')
     header += token_length.to_bytes(1, 'big')
+    header += name_length.to_bytes(1, 'big')
     return header
 
 # メッセージ受信スレッド
@@ -121,11 +122,12 @@ def recieve_message(sock, rate):
     try:
         while True:
             try:
-                # dataにヘッダーは含まれていない
                 data, server = sock.recvfrom(rate)
-                message = data.decode('utf-8')
+                name_length = int.from_bytes(data[:1], 'big')
+                name = data[1:name_length + 1].decode('utf-8')
+                message = data[1 + name_length:].decode('utf-8')
                 now = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
-                print(f'{now} {message}')
+                print(f'{now} {name}: {message}')
                 print(">", end="", flush=True)
             # タイムアウトでループ継続
             except socket.timeout:
@@ -138,10 +140,9 @@ def recieve_message(sock, rate):
     except Exception as e:
         print(f'\nAn error occured: {str(e)}')
 
-def send_message(sock, token, roomname):
+def send_message(sock, token, roomname, name):
     while True:
         print(">", end="", flush=True)
-        # message = input().encode('utf-8')
         message = input()
         # /quitで、チャットを抜ける
         if message.strip() == "/quit":
@@ -152,8 +153,8 @@ def send_message(sock, token, roomname):
         message_bytes = message.encode('utf-8')
         # UUIDのバイト列は16バイト
         token_bytes = token.bytes
-        header = send_message_header_protocol(len(roomname), len(token_bytes))
-        body = roomname + token_bytes + message_bytes
+        header = send_message_header_protocol(len(roomname), len(token_bytes), len(name))
+        body = roomname + token_bytes + name + message_bytes
         data = header + body
         try:
             sock.sendto(data, (server_address, udp_port))

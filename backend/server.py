@@ -44,20 +44,24 @@ def udp_handler():
             # ヘッダーは2バイト。
             # 1バイト目は部屋名の長さ。
             # 2バイト目はトークンの長さ。
-            header = data[:2]
-            body = data[2:]
+            # 3バイト目はユーザー名の長さ。
+            header = data[:3]
+            body = data[3:]
             roomname_length = int.from_bytes(header[:1], 'big')
             token_length = int.from_bytes(header[1:2], 'big')
+            name_length = int.from_bytes(header[2:3], 'big')
             print(f'roomname_length: {roomname_length}')
             print(f'token_length: {token_length}')
             roomname = body[:roomname_length].decode('utf-8')
             print(f'roomname: {roomname}')
             token = body[roomname_length:roomname_length + token_length]
             print(f'token: {uuid.UUID(bytes=token)}')
-            message = body[roomname_length + token_length:].decode('utf-8')
+            name = body[roomname_length + token_length:roomname_length + token_length + name_length]
+            message = body[roomname_length + token_length + name_length:].decode('utf-8')
+            print(f'username: {name.decode("utf-8")}')
             print(f'message: {message}')
             if authentication_token(roomname, address, token):
-                send_message(roomname, message, sock)
+                send_message(roomname, message, sock, name)
         except Exception as e:
             print(f'UDP error: {str(e)}')
 
@@ -192,7 +196,7 @@ def authentication_token(roomname, address, token):
     return False
 
 # その部屋に属するユーザーにメッセージを送信する処理
-def send_message(roomname, message, sock):
+def send_message(roomname, message, sock, name):
     try:
         # 部屋が存在しない場合はエラー
         if roomname not in rooms:
@@ -205,13 +209,19 @@ def send_message(roomname, message, sock):
         # その部屋のホストにメッセージを送信
         for address in rooms[roomname]["host"]:
             try:
-                sock.sendto(message.encode('utf-8'), address)
+                header = len(name).to_bytes(1, 'big')
+                body = name + message.encode('utf-8')
+                data = header + body
+                sock.sendto(data, address)
             except Exception as e:
                 print(f'Error sending message to {address}')
         # その部屋のゲストにメッセージを送信
         for address in rooms[roomname]["guest"]:
             try:
-                sock.sendto(message.encode('utf-8'), address)
+                header = len(name).to_bytes(1, 'big')
+                body = name + message.encode('utf-8')
+                data = header + body
+                sock.sendto(data, address)
             except Exception as e:
                 print(f'Error sending message to {address}')
          # メッセージ送信前に部屋情報を表示（デバッグ用）
